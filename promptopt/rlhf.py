@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import jax
 import jax.numpy as jnp
 import ml_collections
@@ -52,13 +54,22 @@ class RLHF(object):
     def get_embeddings(self):
         return jnp.array(self.embedding_dataset.embeddings)
 
-    def max(self, learning_rate=1e-3, n_iters=1000):
-        derivative_fn = jax.jit(jax.grad(lambda x: self.pref_model.score(x)[0, 0]))
+    def max(self, learning_rate=1e-3, n_iters=1000, reg_const=1):
         embeddings = self.get_embeddings()
         scores = self.pref_model.score(embeddings)
-        embedding = embeddings[jnp.argmax(scores), :][jnp.newaxis, :]
+        init_embedding = embeddings[jnp.argmax(scores), :][jnp.newaxis, :]
+        embedding = deepcopy(init_embedding)
+
+        def objective_fn(embedding):
+            score = self.pref_model.score(embedding)[0, 0]
+            return score - reg_const * ((embedding - init_embedding) ** 2).mean()
+
+        derivative_fn = jax.jit(jax.grad(objective_fn))
+
         for _ in range(n_iters):
+            print(embedding)
             embedding += learning_rate * derivative_fn(embedding)
+
         return embedding[0, :]
 
     def predict(self, embedding):
