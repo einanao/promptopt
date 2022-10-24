@@ -134,7 +134,8 @@ class PrefModel(JAXModel):
     @partial(jax.jit, static_argnames=["self"])
     def score(self, embeddings):
         param_dict = {"params": self.state.params}
-        return self.state.apply_fn(param_dict, embeddings)
+        scores = self.state.apply_fn(param_dict, embeddings)
+        return scores[:, 0]
 
     def build_net_arch(self):
         return build_mlp(n_out_dims=1, **self.net_arch_kwargs)

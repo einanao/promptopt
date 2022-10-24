@@ -68,7 +68,7 @@ class RLHF(object):
         embedding = deepcopy(init_embedding)
 
         def objective_fn(embedding):
-            score = self.pref_model.score(embedding)[0, 0]
+            score = self.pref_model.score(embedding)[0]
             dist_penalty = (((embedding - init_embedding) ** 2) / embedding_var).mean()
             return score - reg_const * dist_penalty
 

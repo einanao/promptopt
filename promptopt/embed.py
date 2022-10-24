@@ -7,10 +7,11 @@ class CLIP(object):
         self.model = open_clip.create_model_and_transforms(
             "ViT-B-32-quickgelu", pretrained="laion400m_e32"
         )[0]
+        self.n_embedding_dims = 512
 
-    def embed_text(self, text):
-        tokens = open_clip.tokenize([text])
+    def embed_strings(self, strs):
+        tokens = open_clip.tokenize(strs)
         with torch.no_grad(), torch.cuda.amp.autocast():
-            embedding = self.model.encode_text(tokens)
-            embedding /= embedding.norm(dim=-1, keepdim=True)
-        return embedding[0, :]
+            embeddings = self.model.encode_text(tokens)
+            embeddings /= embeddings.norm(dim=-1, keepdim=True)
+        return embeddings.detach().numpy()

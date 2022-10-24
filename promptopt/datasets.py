@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 
 
 def numpy_collate(batch):
@@ -23,17 +23,23 @@ class Dataset(torch.utils.data.Dataset):
         n_train = int(self.train_frac * n)
         n_val = n - n_train
         train_data, val_data = torch.utils.data.random_split(self, [n_train, n_val])
-        make_dataloader = lambda data: DataLoader(
-            data, batch_size=self.batch_size, shuffle=True, collate_fn=numpy_collate
-        )
+
+        def make_dataloader(data):
+            weights = self.get_weights(data)
+            sampler = WeightedRandomSampler(weights, num_samples=self.batch_size)
+            return DataLoader(data, collate_fn=numpy_collate, sampler=sampler)
+
         self.train_dataloader = make_dataloader(train_data)
         self.val_dataloader = make_dataloader(val_data)
 
+    def get_weights(self, data):
+        return np.ones(len(data))
+
 
 class EmbeddingDataset(Dataset):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, embeddings=[], **kwargs):
         super().__init__(*args, **kwargs)
-        self.embeddings = []
+        self.embeddings = embeddings
 
     def append(self, embedding):
         self.embeddings.append(embedding)
@@ -46,12 +52,15 @@ class EmbeddingDataset(Dataset):
 
 
 class PrefDataset(Dataset):
-    def __init__(self, embedding_dataset, *args, **kwargs):
+    def __init__(self, embedding_dataset, *args, pref_data=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.embedding_dataset = embedding_dataset
-        self.a_idxes = []
-        self.b_idxes = []
-        self.prefs = []
+        if pref_data is None:
+            self.a_idxes = []
+            self.b_idxes = []
+            self.prefs = []
+        else:
+            self.a_idxes, self.b_idxes, self.prefs = list(zip(*pref_data))
 
     def append(self, a_idx, b_idx, pref):
         n = len(self.embedding_dataset)
@@ -69,3 +78,9 @@ class PrefDataset(Dataset):
         a_embedding = self.embedding_dataset[self.a_idxes[i]]
         b_embedding = self.embedding_dataset[self.b_idxes[i]]
         return a_embedding, b_embedding, self.prefs[i]
+
+    def get_weights(self, data):
+        prefs = np.array(data.dataset.prefs)[data.indices]
+        class_counts = np.bincount(prefs)
+        class_weights = 1.0 / class_counts
+        return class_weights[prefs]
