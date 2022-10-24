@@ -106,10 +106,10 @@ class PrefModel(JAXModel):
         self.net_arch_kwargs = net_arch_kwargs
 
     @partial(jax.jit, static_argnames=["self"])
-    def _predict(self, state, params, a_embs, b_embs):
+    def _predict(self, state, params, a_embeddings, b_embeddings):
         param_dict = {"params": params}
-        a_logits = state.apply_fn(param_dict, a_embs)
-        b_logits = state.apply_fn(param_dict, b_embs)
+        a_logits = state.apply_fn(param_dict, a_embeddings)
+        b_logits = state.apply_fn(param_dict, b_embeddings)
         logsumexps = jax.scipy.special.logsumexp(
             jnp.concatenate([a_logits, b_logits], axis=1), axis=1, keepdims=True
         )
@@ -124,9 +124,17 @@ class PrefModel(JAXModel):
         loss = optax.softmax_cross_entropy_with_integer_labels(logits, prefs)
         return jnp.mean(loss)
 
-    def predict(self, a_embs, b_embs):
-        logits = self._predict(self.state, self.state.params, a_embs, b_embs)
+    @partial(jax.jit, static_argnames=["self"])
+    def predict(self, a_embeddings, b_embeddings):
+        logits = self._predict(
+            self.state, self.state.params, a_embeddings, b_embeddings
+        )
         return jnp.exp(logits[:, 0])
+
+    @partial(jax.jit, static_argnames=["self"])
+    def score(self, embeddings):
+        param_dict = {"params": self.state.params}
+        return self.state.apply_fn(param_dict, embeddings)
 
     def build_net_arch(self):
         return build_mlp(n_out_dims=1, **self.net_arch_kwargs)
