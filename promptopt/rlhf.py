@@ -54,15 +54,17 @@ class RLHF(object):
     def get_embeddings(self):
         return jnp.array(self.embedding_dataset.embeddings)
 
-    def max(self, learning_rate=1e-3, n_iters=1000, reg_const=1):
+    def max(self, learning_rate=1e-3, n_iters=1000, reg_const=1e2):
         embeddings = self.get_embeddings()
+        embedding_var = jnp.var(embeddings, axis=0)
         scores = self.pref_model.score(embeddings)
         init_embedding = embeddings[jnp.argmax(scores), :][jnp.newaxis, :]
         embedding = deepcopy(init_embedding)
 
         def objective_fn(embedding):
             score = self.pref_model.score(embedding)[0, 0]
-            return score - reg_const * ((embedding - init_embedding) ** 2).mean()
+            dist_penalty = (((embedding - init_embedding) ** 2) / embedding_var).mean()
+            return score - reg_const * dist_penalty
 
         derivative_fn = jax.jit(jax.grad(objective_fn))
 
