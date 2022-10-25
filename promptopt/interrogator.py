@@ -193,7 +193,7 @@ class Gator(object):
         extended_flavors = set(flaves)
         for _ in range(25):
             try:
-                best = rank_top([f"{best_prompt}, {f}" for f in extended_flavors])
+                best = self.rank_top([f"{best_prompt}, {f}" for f in extended_flavors])
                 flave = best[len(best_prompt) + 2 :]
                 if not check(flave):
                     break
