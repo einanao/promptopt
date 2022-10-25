@@ -7,7 +7,7 @@ class CLIP(object):
         self.model = open_clip.create_model_and_transforms(
             "ViT-B-32-quickgelu", pretrained="laion400m_e32"
         )[0]
-        self.n_embedding_dims = 512
+        self.n_embedding_dims = self.embed_string("").size
 
     def embed_string(self, s):
         return self.embed_strings([s])[0]
