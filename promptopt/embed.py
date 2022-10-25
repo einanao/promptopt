@@ -9,9 +9,12 @@ class CLIP(object):
         )[0]
         self.n_embedding_dims = 512
 
+    def embed_string(self, s):
+        return self.embed_strings([s])[0]
+
     def embed_strings(self, strs):
         tokens = open_clip.tokenize(strs)
         with torch.no_grad(), torch.cuda.amp.autocast():
             embeddings = self.model.encode_text(tokens)
             embeddings /= embeddings.norm(dim=-1, keepdim=True)
-        return embeddings.detach().numpy()
+        return embeddings.half().detach().numpy()
