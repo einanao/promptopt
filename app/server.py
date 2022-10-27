@@ -23,6 +23,17 @@ pref_model_train_config = rlhf.get_default_config()
 pref_model_train_config.verbose = True
 
 
+def prefs_from_ranking(n):
+    prefs = []
+    for i in range(n):
+        for j in range(i + 1, n):
+            if np.random.random() < 0.5:
+                prefs.append((i, j, 0))
+            else:
+                prefs.append((j, i, 1))
+    return prefs
+
+
 def optimize_prompt(data):
     prompts = data["prompts"]
     pref_data = data["prefs"]
@@ -45,21 +56,25 @@ def optimize_prompt(data):
     return best_prompt
 
 
-app = Flask(__name__, template_folder=utils.TEMPLATE_DIR)
+app = Flask(__name__)
 
 
-@app.route("/api/optimize", methods=["POST"])
-def search():
+@app.route("/api/opt_from_prefs", methods=["POST"])
+def opt_from_prefs():
     data = json.loads(request.values["data"])
     prompt = optimize_prompt(data)
     resp = {"optimized_prompt": prompt}
     return json.dumps(resp)
 
 
-@app.route("/", methods=["GET"])
-def main():
-    return render_template("index.html")
+@app.route("/api/opt_from_ranking", methods=["POST"])
+def opt_from_ranking():
+    data = json.loads(request.values["data"])
+    data["prefs"] = prefs_from_ranking(len(data["prompts"]))
+    prompt = optimize_prompt(data)
+    resp = {"optimized_prompt": prompt}
+    return json.dumps(resp)
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=utils.FLASK_PORT)
+    app.run(host="0.0.0.0", port=8000)
