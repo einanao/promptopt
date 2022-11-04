@@ -12,7 +12,8 @@ class CLIP(object):
         return self.embed_strings([s])[0]
 
     def embed_strings(self, strs):
-        inputs = self.processor(text=strs, return_tensors="pt", padding=True)
+        inputs = self.processor(
+            text=strs, return_tensors="pt", padding=True, truncation=True
+        )
         outputs = self.model.get_text_features(**inputs)
         return outputs.half().detach().numpy()
-

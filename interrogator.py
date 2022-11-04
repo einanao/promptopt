@@ -50,9 +50,7 @@ class LabelTable:
 
     def _rank(self, text_embeds, top_count=1):
         top_count = min(top_count, len(text_embeds))
-        text_embeds = (
-            torch.stack([torch.from_numpy(t) for t in text_embeds]).float()
-        )
+        text_embeds = torch.stack([torch.from_numpy(t) for t in text_embeds]).float()
         scores = self.score_func(text_embeds.detach().numpy())[None, :]
         _, top_labels = scores.cpu().topk(top_count, dim=-1)
         return [top_labels[0][i].numpy() for i in range(top_count)]
@@ -183,7 +181,7 @@ class Gator(object):
                         prompt += ", " + opts[bit]
                 prompts.append(prompt)
 
-                if len(prompts) >= batch_size or i == n-1:
+                if len(prompts) >= batch_size or i == n - 1:
                     prompt = self.rank_top(prompts)
                     score = self.score_prompt(prompt)
                     if score > best_score:
