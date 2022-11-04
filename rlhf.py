@@ -4,8 +4,8 @@ import jax
 import jax.numpy as jnp
 import ml_collections
 
-from . import datasets
-from . import embed
+import datasets
+import embed
 
 
 def get_default_config():
@@ -41,17 +41,14 @@ class RLHF(object):
         self.pref_dataset = pref_dataset
         self.embedding_model = embedding_model
 
-        if pref_dataset is not None:
-            self.train()
-
     def train(self):
         self.pref_dataset.split()
-        self.pref_model.train(self.pref_dataset, self.pref_model_train_config)
+        return self.pref_model.train(self.pref_dataset, self.pref_model_train_config)
 
     def update(self, *args):
         for x in zip(*args):
             self.pref_dataset.append(*x)
-        self.train()
+        return self.train()
 
     def append_prompt(self, prompt):
         embedding = self.embedding_model.embed(prompt)

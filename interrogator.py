@@ -11,14 +11,12 @@ import torch
 
 from tqdm import tqdm
 
-from . import utils
-
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+import utils
 
 
 chunk_size = 2048
 flavor_intermediate_count = 2048
+batch_size = 32
 
 
 class LabelTable:
@@ -31,8 +29,7 @@ class LabelTable:
 
         hash = hashlib.sha256(",".join(labels).encode()).hexdigest()
 
-        os.makedirs(utils.CACHE_DIR, exist_ok=True)
-        cache_filepath = os.path.join(utils.CACHE_DIR, f"{desc}.pkl")
+        cache_filepath = os.path.join(utils.DATA_DIR, f"{desc}.pkl")
         if desc is not None and os.path.exists(cache_filepath):
             with open(cache_filepath, "rb") as f:
                 data = pickle.load(f)
@@ -44,7 +41,7 @@ class LabelTable:
             self.embeds = []
             chunks = np.array_split(self.labels, max(1, len(self.labels) / chunk_size))
             for chunk in tqdm(chunks, desc=f"Preprocessing {desc}" if desc else None):
-                self.embeds.extend(list(embedding_model.embed_strings(chunk)))
+                self.embeds.extend(list(embedding_model.embed_strings(chunk.tolist())))
 
             with open(cache_filepath, "wb") as f:
                 pickle.dump(
@@ -54,7 +51,7 @@ class LabelTable:
     def _rank(self, text_embeds, top_count=1):
         top_count = min(top_count, len(text_embeds))
         text_embeds = (
-            torch.stack([torch.from_numpy(t) for t in text_embeds]).float().to(device)
+            torch.stack([torch.from_numpy(t) for t in text_embeds]).float()
         )
         scores = self.score_func(text_embeds.detach().numpy())[None, :]
         _, top_labels = scores.cpu().topk(top_count, dim=-1)
@@ -87,7 +84,7 @@ def load_list(filename):
 
 
 class Gator(object):
-    def __init__(self, embedding_model, score_func):
+    def __init__(self, embedding_model, score_func, display):
         sites = [
             "Artstation",
             "behance",
@@ -142,6 +139,7 @@ class Gator(object):
 
         self.embedding_model = embedding_model
         self.score_func = score_func
+        self.display = display
 
     def rank_top(self, text_array):
         text_features = self.embedding_model.embed_strings(text_array)
@@ -161,6 +159,7 @@ class Gator(object):
 
         best_prompt = init_prompt
         best_score = self.score_prompt(best_prompt)
+        self.display(best_score, best_prompt)
 
         def check(addition):
             nonlocal best_prompt, best_score
@@ -169,24 +168,29 @@ class Gator(object):
             if score > best_score:
                 best_score = score
                 best_prompt = prompt
+                self.display(best_score, best_prompt)
                 return True
             return False
 
         def check_multi_batch(opts):
             nonlocal best_prompt, best_score
             prompts = []
-            for i in range(2 ** len(opts)):
+            n = 2 ** len(opts)
+            for i in range(n):
                 prompt = best_prompt
                 for bit in range(len(opts)):
                     if i & (1 << bit):
                         prompt += ", " + opts[bit]
                 prompts.append(prompt)
 
-            prompt = self.rank_top(prompts)
-            score = self.score_prompt(prompt)
-            if score > best_score:
-                best_score = score
-                best_prompt = prompt
+                if len(prompts) >= batch_size or i == n-1:
+                    prompt = self.rank_top(prompts)
+                    score = self.score_prompt(prompt)
+                    if score > best_score:
+                        best_score = score
+                        best_prompt = prompt
+                        self.display(best_score, best_prompt)
+                    prompts = []
 
         check_multi_batch([best_medium, best_artist, best_trending, best_movement])
 

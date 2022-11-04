@@ -84,6 +84,8 @@ class JAXModel(object):
         self.state = state
         best_val_loss = self.compute_val_loss(state, dataset)
 
+        train_losses = []
+        val_losses = []
         for epoch in range(config.num_epochs):
             train_loss, state = self.train_epoch(state, dataset)
             val_loss = self.compute_val_loss(state, dataset)
@@ -96,8 +98,10 @@ class JAXModel(object):
                     "epoch:% 3d, train_loss: %.4f, val_loss: %.4f"
                     % (epoch, train_loss, val_loss)
                 )
+            train_losses.append(train_loss)
+            val_losses.append(val_loss)
 
-        return self.state
+        return self.state, train_losses, val_losses
 
 
 class PrefModel(JAXModel):
